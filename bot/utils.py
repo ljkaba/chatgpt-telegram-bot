@@ -280,27 +280,23 @@ def is_within_budget(config, usage, update: Update, is_inline=False) -> bool:
 
 
 def add_chat_request_to_usage_tracker(usage, config, user_id, used_tokens):
-    """
-    Add chat request to usage tracker
-    :param usage: The usage tracker object
-    :param config: The bot configuration object
-    :param user_id: The user id
-    :param used_tokens: The number of tokens used
-    """
     try:
-        if int(used_tokens) == 0:
-            logging.warning('No tokens used. Not adding chat request to usage tracker.')
+        if not used_tokens or int(used_tokens) == 0:
+            logging.warning('No tokens used or invalid token value. Not adding chat request to usage tracker.')
             return
-        # add chat request to users usage tracker
-        usage[user_id].add_chat_tokens(used_tokens, config['token_price'])
-        # add guest chat request to guest usage tracker
+        token_price = config.get('token_price', 0.002)
+        logging.debug(f"Adding {used_tokens} tokens for user {user_id} with price {token_price}")
+        if user_id not in usage:
+            logging.debug(f"User {user_id} not in usage dict, creating new UsageTracker.")  # Réduit de WARNING à DEBUG
+            usage[user_id] = UsageTracker(user_id, "unknown")
+        usage[user_id].add_chat_tokens(int(used_tokens), token_price)
         allowed_user_ids = config['allowed_user_ids'].split(',')
         if str(user_id) not in allowed_user_ids and 'guests' in usage:
-            usage["guests"].add_chat_tokens(used_tokens, config['token_price'])
+            usage["guests"].add_chat_tokens(int(used_tokens), token_price)
+    except KeyError as e:
+        logging.error(f"KeyError in add_chat_request_to_usage_tracker for user {user_id}: Missing key {str(e)}")
     except Exception as e:
-        logging.warning(f'Failed to add tokens to usage_logs: {str(e)}')
-        pass
-
+        logging.error(f"Unexpected error in add_chat_request_to_usage_tracker for user {user_id}: Type={type(e).__name__}, Message={str(e)}")
 
 def get_reply_to_message_id(config, update: Update):
     """

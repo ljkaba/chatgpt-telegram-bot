@@ -2,6 +2,8 @@ import logging
 import os
 
 from dotenv import load_dotenv
+from scheduler import start_scheduler
+import threading
 
 from plugin_manager import PluginManager
 from openai_helper import OpenAIHelper, default_max_tokens, are_functions_available
@@ -15,6 +17,7 @@ def main():
     # Setup logging
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        #level=logging.DEBUG  # Changez de INFO à DEBUG
         level=logging.INFO
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -100,6 +103,11 @@ def main():
         'tts_prices': [float(i) for i in os.environ.get('TTS_PRICES', "0.015,0.030").split(",")],
         'transcription_price': float(os.environ.get('TRANSCRIPTION_PRICE', 0.006)),
         'bot_language': os.environ.get('BOT_LANGUAGE', 'en'),
+        # ... (autres claves)
+        'free_message_limit': int(os.environ.get('FREE_MESSAGE_LIMIT', 5)),  # Ajoutez ceci
+        'subscription_price': float(os.environ.get('SUBSCRIPTION_PRICE', 5.0)),
+        'subscription_duration': int(os.environ.get('SUBSCRIPTION_DURATION', 30)),
+        # ... (reste des claves)
     }
 
     plugin_config = {
@@ -111,6 +119,10 @@ def main():
     openai_helper = OpenAIHelper(config=openai_config, plugin_manager=plugin_manager)
     telegram_bot = ChatGPTTelegramBot(config=telegram_config, openai=openai_helper)
     telegram_bot.run()
+    # Démarrer le scheduler dans un thread séparé
+    scheduler_thread = threading.Thread(target=start_scheduler, args=(telegram_bot,))
+    scheduler_thread.daemon = True
+    scheduler_thread.start()
 
 
 if __name__ == '__main__':
